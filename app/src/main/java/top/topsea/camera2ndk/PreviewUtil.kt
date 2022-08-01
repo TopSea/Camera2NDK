@@ -2,7 +2,9 @@ package top.topsea.camera2ndk
 
 import android.graphics.ImageFormat
 import android.media.Image
+import android.util.Log
 import java.lang.Integer.min
+import java.util.*
 
 object PreviewUtil {
 
@@ -45,6 +47,8 @@ object PreviewUtil {
                 }
             }
         }
+
+//        Log.d(TAG, "YUV_420_888_data: ${data.contentToString()}")
         return data
     }
 }

@@ -7,6 +7,7 @@ import android.graphics.SurfaceTexture
 import android.hardware.camera2.*
 import android.media.Image
 import android.media.ImageReader
+import android.opengl.GLSurfaceView
 import android.os.*
 import android.util.Log
 import android.util.Size
@@ -28,7 +29,7 @@ class MainActivity : AppCompatActivity(), Handler.Callback {
                 android.Manifest.permission.CAMERA,
                 android.Manifest.permission.WRITE_EXTERNAL_STORAGE
         )
-        private const val REQUIRED_SUPPORTED_HARDWARE_LEVEL: Int = CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LIMITED
+        private const val REQUIRED_SUPPORTED_HARDWARE_LEVEL: Int = CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_FULL
         private const val MSG_OPEN_CAMERA: Int = 1
         private const val MSG_CREATE_SESSION: Int = 3
         private const val MSG_SET_PREVIEW_SIZE: Int = 5
@@ -37,7 +38,6 @@ class MainActivity : AppCompatActivity(), Handler.Callback {
 
     private val mainHandler: Handler = Handler(Looper.getMainLooper())
     private val cameraManager: CameraManager by lazy { getSystemService(CameraManager::class.java) }
-//    private val cameraPreview: CameraPreview by lazy { findViewById(R.id.camera_preview) }
     private var cameraThread: HandlerThread? = null
     private var cameraHandler: Handler? = null
     private var frontCameraId: String? = null
@@ -47,8 +47,7 @@ class MainActivity : AppCompatActivity(), Handler.Callback {
     private var cameraDevice: SettableFuture<CameraDevice>? = null
     private var cameraCharacteristics: SettableFuture<CameraCharacteristics>? = null
     private var captureSession: SettableFuture<CameraCaptureSession>? = null
-    private var previewSurfaceTexture: SettableFuture<SurfaceTexture>? = null
-    private var previewSurface: Surface? = null
+
     private var previewDataImageReader: ImageReader? = null
     private var previewDataSurface: Surface? = null
 
@@ -64,32 +63,27 @@ class MainActivity : AppCompatActivity(), Handler.Callback {
             MSG_CREATE_SESSION -> {
                 val sessionStateCallback = SessionStateCallback()
                 val outputs = mutableListOf<Surface>()
-                val previewSurface = previewSurface
-                val previewDataSurface = previewDataSurface
-                outputs.add(previewSurface!!)
-                if (previewDataSurface != null) {
-                    outputs.add(previewDataSurface)
+                previewDataSurface?.let {
+                    Log.d(TAG, "Handle message: MSG_CREATE_SESSION  5")
+                    outputs.add(it)
                 }
+
                 cameraDevice?.get()?.createCaptureSession(outputs, sessionStateCallback, mainHandler)
                 Log.d(TAG, "Handle message: MSG_CREATE_SESSION")
             }
             MSG_SET_PREVIEW_SIZE -> {
                 val cameraCharacteristics = cameraCharacteristics?.get()
-                val previewSurfaceTexture = previewSurfaceTexture?.get()
-                if (cameraCharacteristics != null && previewSurfaceTexture != null) {
+                if (cameraCharacteristics != null) {
                     // Get optimal preview size according to the specified max width and max height.
                     val maxWidth = 1440
                     val maxHeight = 1080
                     val previewSize = getOptimalSize(cameraCharacteristics, SurfaceTexture::class.java, maxWidth, maxHeight)!!
 
-                    // Set the SurfaceTexture's buffer size with preview size.
-                    previewSurfaceTexture.setDefaultBufferSize(previewSize.width, previewSize.height)
-                    previewSurface = Surface(previewSurfaceTexture)
-
                     // Set up an ImageReader to receive preview frame data if YUV_420_888 is supported.
                     val imageFormat = ImageFormat.YUV_420_888
                     val streamConfigurationMap = cameraCharacteristics[CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP]
                     if (streamConfigurationMap?.isOutputSupportedFor(imageFormat) == true) {
+                        Log.d(TAG, "MSG_SET_PREVIEW_SIZE: start2")
                         previewDataImageReader = ImageReader.newInstance(previewSize.width, previewSize.height, imageFormat, 3)
                         previewDataImageReader?.setOnImageAvailableListener(OnPreviewDataAvailableListener(), cameraHandler)
                         previewDataSurface = previewDataImageReader?.surface
@@ -102,11 +96,9 @@ class MainActivity : AppCompatActivity(), Handler.Callback {
                 val captureSession = captureSession?.get()
                 if (cameraDevice != null && captureSession != null) {
                     val requestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
-                    val previewSurface = previewSurface
-                    val previewDataSurface = previewDataSurface
-                    requestBuilder.addTarget(previewSurface!!)
-                    if (previewDataSurface != null) {
-                        requestBuilder.addTarget(previewDataSurface)
+
+                    previewDataSurface?.let {
+                        requestBuilder.addTarget(it)
                     }
                     val request = requestBuilder.build()
                     captureSession.setRepeatingRequest(request, RepeatingCaptureStateCallback(), mainHandler)
@@ -126,7 +118,9 @@ class MainActivity : AppCompatActivity(), Handler.Callback {
         jniGLSurfaceView = JniGLSurfaceView(this)
         jniRender = JniRender()
         jniGLSurfaceView.setRenderer(jniRender)
+        jniGLSurfaceView.renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
         setContentView(jniGLSurfaceView)
+
         startCameraThread()
 
         val cameraIdList = cameraManager.cameraIdList
@@ -142,9 +136,6 @@ class MainActivity : AppCompatActivity(), Handler.Callback {
                 }
             }
         }
-
-//        cameraPreview.surfaceTextureListener = PreviewSurfaceTextureListener()
-        previewSurfaceTexture = SettableFuture()
     }
 
     override fun onResume() {
@@ -322,22 +313,6 @@ class MainActivity : AppCompatActivity(), Handler.Callback {
         }
     }
 
-    private inner class PreviewSurfaceTextureListener : TextureView.SurfaceTextureListener {
-        @MainThread
-        override fun onSurfaceTextureSizeChanged(surfaceTexture: SurfaceTexture, width: Int, height: Int) = Unit
-
-        @MainThread
-        override fun onSurfaceTextureUpdated(surfaceTexture: SurfaceTexture) = Unit
-
-        @MainThread
-        override fun onSurfaceTextureDestroyed(surfaceTexture: SurfaceTexture): Boolean = false
-
-        @MainThread
-        override fun onSurfaceTextureAvailable(surfaceTexture: SurfaceTexture, width: Int, height: Int) {
-            previewSurfaceTexture?.set(surfaceTexture)
-        }
-    }
-
     private inner class RepeatingCaptureStateCallback : CameraCaptureSession.CaptureCallback() {
         @MainThread
         override fun onCaptureStarted(session: CameraCaptureSession, request: CaptureRequest, timestamp: Long, frameNumber: Long) {
@@ -367,7 +342,7 @@ class MainActivity : AppCompatActivity(), Handler.Callback {
     }
 
     fun onPreviewReady(data: ByteArray, width: Int, height: Int) {
-
+//        Log.d(TAG, "onPreviewReady: $width  $height")
         jniRender.setRenderFrame(IMAGE_FORMAT_I420, data, width, height)
         jniGLSurfaceView.requestRender()
     }

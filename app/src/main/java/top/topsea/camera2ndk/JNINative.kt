@@ -1,6 +1,7 @@
 package top.topsea.camera2ndk
 
 import android.content.res.AssetManager
+import android.media.Image
 import android.util.Log
 
 /**
@@ -26,4 +27,6 @@ object JNINative {
     external fun renderFrame()
 
     external fun jniUpdateFrame(format: Int, data: ByteArray, width: Int, height: Int)
+
+    external fun onFrameReady(image: Image)
 }

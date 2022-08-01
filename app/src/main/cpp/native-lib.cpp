@@ -60,3 +60,9 @@ float GetFrameTime() {
     lastTime = currentTime;
     return float(frameTime) / 1000.0f;
 }
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_top_topsea_camera2ndk_JNINative_onFrameReady(JNIEnv *env, jobject thiz, jobject image) {
+
+}

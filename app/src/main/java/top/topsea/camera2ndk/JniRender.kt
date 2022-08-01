@@ -30,10 +30,7 @@ class JniRender: GLSurfaceView.Renderer {
     }
 
     fun setRenderFrame(format: Int, data: ByteArray, width: Int, height: Int) {
-        Log.d(
-            TAG,
-            "setRenderFrame() called with: data = [$data], width = [$width], height = [$height]"
-        )
+//        Log.d(TAG, "setRenderFrame() called with: data = [$data], width = [$width], height = [$height]")
         JNINative.jniUpdateFrame(format, data, width, height)
     }
 }
