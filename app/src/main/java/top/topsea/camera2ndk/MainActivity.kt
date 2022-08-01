@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.graphics.ImageFormat
 import android.graphics.SurfaceTexture
 import android.hardware.camera2.*
+import android.media.Image
 import android.media.ImageReader
 import android.os.*
 import android.util.Log
@@ -16,13 +17,12 @@ import androidx.annotation.RequiresApi
 import androidx.annotation.WorkerThread
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import top.topsea.camera2ndk.isHardwareLevelSupported
 
+const val TAG: String = "TopSea:::"
 @RequiresApi(Build.VERSION_CODES.M)
 class MainActivity : AppCompatActivity(), Handler.Callback {
 
     companion object {
-        private const val TAG: String = "TopSea:::"
         private const val REQUEST_PERMISSION_CODE: Int = 1
         private val REQUIRED_PERMISSIONS: Array<String> = arrayOf(
                 android.Manifest.permission.CAMERA,
@@ -37,7 +37,7 @@ class MainActivity : AppCompatActivity(), Handler.Callback {
 
     private val mainHandler: Handler = Handler(Looper.getMainLooper())
     private val cameraManager: CameraManager by lazy { getSystemService(CameraManager::class.java) }
-    private val cameraPreview: CameraPreview by lazy { findViewById(R.id.camera_preview) }
+//    private val cameraPreview: CameraPreview by lazy { findViewById(R.id.camera_preview) }
     private var cameraThread: HandlerThread? = null
     private var cameraHandler: Handler? = null
     private var frontCameraId: String? = null
@@ -117,9 +117,16 @@ class MainActivity : AppCompatActivity(), Handler.Callback {
         return false
     }
 
+    val IMAGE_FORMAT_I420 = 0x04
+    private lateinit var jniGLSurfaceView: JniGLSurfaceView
+    private lateinit var jniRender: JniRender
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        jniGLSurfaceView = JniGLSurfaceView(this)
+        jniRender = JniRender()
+        jniGLSurfaceView.setRenderer(jniRender)
+        setContentView(jniGLSurfaceView)
         startCameraThread()
 
         val cameraIdList = cameraManager.cameraIdList
@@ -136,7 +143,7 @@ class MainActivity : AppCompatActivity(), Handler.Callback {
             }
         }
 
-        cameraPreview.surfaceTextureListener = PreviewSurfaceTextureListener()
+//        cameraPreview.surfaceTextureListener = PreviewSurfaceTextureListener()
         previewSurfaceTexture = SettableFuture()
     }
 
@@ -350,17 +357,18 @@ class MainActivity : AppCompatActivity(), Handler.Callback {
          */
         override fun onImageAvailable(imageReader: ImageReader) {
             val image = imageReader.acquireNextImage()
-            if (image != null) {
-                val planes = image.planes
-                val yPlane = planes[0]
-                val uPlane = planes[1]
-                val vPlane = planes[2]
-                val yBuffer = yPlane.buffer // Data from Y channel
-                val uBuffer = uPlane.buffer // Data from U channel
-                val vBuffer = vPlane.buffer // Data from V channel
-            }
-            image?.close()
+            onPreviewReady(
+                PreviewUtil.YUV_420_888_data(image),
+                image.width,
+                image.height
+            )
+            image.close()
         }
     }
 
+    fun onPreviewReady(data: ByteArray, width: Int, height: Int) {
+
+        jniRender.setRenderFrame(IMAGE_FORMAT_I420, data, width, height)
+        jniGLSurfaceView.requestRender()
+    }
 }

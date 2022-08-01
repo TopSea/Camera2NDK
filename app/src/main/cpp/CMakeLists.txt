@@ -9,6 +9,9 @@ cmake_minimum_required(VERSION 3.18.1)
 
 project("camera2ndk")
 
+# 添加库
+include_directories(include)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -L${CMAKE_SOURCE_DIR}/libs/${CMAKE_ANDROID_ARCH_ABI}")
 # Creates and names a library, sets it as either STATIC
 # or SHARED, and provides the relative paths to its source code.
 # You can define multiple libraries, and CMake builds them for you.
@@ -21,7 +24,9 @@ add_library( # Sets the name of the library.
         SHARED
 
         # Provides a relative path to your source file(s).
-        native-lib.cpp)
+        native-lib.cpp
+        util.cpp
+        scene.cpp)
 
 # Searches for a specified prebuilt library and stores the path as a
 # variable. Because CMake includes system libraries in the search path by
@@ -43,6 +48,11 @@ find_library( # Sets the name of the path variable.
 target_link_libraries( # Specifies the target library.
         camera2ndk
 
+        opencv_java4
+        jnigraphics
+        android
+        EGL
+        GLESv3
         # Links the target library to the log library
         # included in the NDK.
         ${log-lib})
