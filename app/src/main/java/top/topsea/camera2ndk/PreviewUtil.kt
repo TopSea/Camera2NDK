@@ -12,10 +12,8 @@ object PreviewUtil {
         val imageWidth = image.width
         val imageHeight = image.height
         val planes = image.planes
-        val data = ByteArray(
-            imageWidth * imageHeight *
-                    ImageFormat.getBitsPerPixel(ImageFormat.YUV_420_888) / 8
-        )
+        val data = ByteArray(imageWidth * imageHeight *
+                    ImageFormat.getBitsPerPixel(ImageFormat.YUV_420_888) / 8)
         var offset = 0
         for (plane in planes.indices) {
             val buffer = planes[plane].buffer

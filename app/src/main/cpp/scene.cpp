@@ -20,9 +20,9 @@ GLint uni_u;
 GLint uni_v;
 
 static const float vertices[] = {
-     1.f,  1.f, 0.0f, 1.0f, 1.0f,
+     1.f,  1.f, 0.0f, 0.0f, 0.0f,
      1.f, -1.f, 0.0f, 1.0f, 0.0f,
-    -1.f, -1.f, 0.0f, 0.0f, 0.0f,
+    -1.f, -1.f, 0.0f, 1.0f, 1.0f,
     -1.f,  1.f, 0.0f, 0.0f, 1.0f
 };
 unsigned int indices[] = {
@@ -212,7 +212,6 @@ bool UpdateTextures() {
                  GL_LUMINANCE, GL_UNSIGNED_BYTE, m_RenderFrame.ppPlane[2]);
 //    glGenerateMipmap(GL_TEXTURE_2D);
 
-    LOGI("::UpdateTextures");
     return true;
 }
 

@@ -120,6 +120,9 @@ class MainActivity : AppCompatActivity(), Handler.Callback {
         jniGLSurfaceView.setRenderer(jniRender)
         jniGLSurfaceView.renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
         setContentView(jniGLSurfaceView)
+        val params = jniGLSurfaceView.layoutParams
+        params.height = 1440
+        params.width = 1080
 
         startCameraThread()
 
