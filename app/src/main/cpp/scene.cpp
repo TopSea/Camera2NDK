@@ -8,16 +8,14 @@
 #include "util.h"
 #include "native-lib.h"
 #include "my_log.h"
-#include "ImageDef.h"
 #include <ctime>
 #include <jni.h>
+#include <opencv2/opencv.hpp>
+#include <opencv2/core/types_c.h>
+#include "random"
 
-// 将数据从 cpu 放到 gpu
 GLuint program;
-
-GLint uni_y;
-GLint uni_u;
-GLint uni_v;
+GLint uni_texture;
 
 static const float vertices[] = {
      1.f,  1.f, 0.0f, 0.0f, 0.0f,
@@ -61,26 +59,17 @@ void Init() {
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
-    uni_y = glGetUniformLocation(program, "s_textureY");
-    uni_u = glGetUniformLocation(program, "s_textureU");
-    uni_v = glGetUniformLocation(program, "s_textureV");
-    glUniform1i(uni_y, 0);
-    glUniform1i(uni_u, 1);
-    glUniform1i(uni_v, 2);
+    uni_texture = glGetUniformLocation(program, "uni_texture");
+    glUniform1i(uni_texture, 0);
 }
 
 void SetViewPortSize(int width, int height) {
     glViewport(0, 0, width, height);
 }
 
-GLuint m_YTextureId;
-GLuint m_UTextureId;
-GLuint m_VTextureId;
-NativeImage m_RenderFrame;
-
-void init() {
-    memset(&m_RenderFrame, 0, sizeof(NativeImage));
-}
+GLuint m_texture;
+cv::Mat img;
+int mWidth, mHeight;
 
 extern "C"
 JNIEXPORT void JNICALL
@@ -91,89 +80,31 @@ Java_top_topsea_camera2ndk_JNINative_jniUpdateFrame(JNIEnv *env, jobject thiz, j
     auto* buf = new unsigned char[len];
     env->GetByteArrayRegion(data, 0, len, reinterpret_cast<jbyte*>(buf));
 
-//    LOGI("%d", *buf);
+    mWidth = width;
+    mHeight = height;
 
-//    LOGI("update_frame format=%d, width=%d, height=%d, pData=%p",
-//         format, width, height, buf);
-//    NativeImage nativeImage;
-    m_RenderFrame.format = format;
-    m_RenderFrame.width = width;
-    m_RenderFrame.height = height;
-    m_RenderFrame.ppPlane[0] = buf;
+    img = cv::Mat((int)(height * 1.5), width, CV_8U);
+    img.data = buf;
 
-    switch (format)
-    {
-        case IMAGE_FORMAT_NV12:
-        case IMAGE_FORMAT_NV21:
-            m_RenderFrame.ppPlane[1] = m_RenderFrame.ppPlane[0] + width * height;
-            break;
-        case IMAGE_FORMAT_I420:
-            m_RenderFrame.ppPlane[1] = m_RenderFrame.ppPlane[0] + width * height;
-            m_RenderFrame.ppPlane[2] = m_RenderFrame.ppPlane[1] + width * height / 4;
-            break;
-        default:
-            break;
-    }
-//    NativeImageUtil::CopyNativeImage(&nativeImage, &m_RenderFrame);
+    cv::cvtColor(img, img, cv::COLOR_YUV2RGB_I420);
+
     delete[] buf;
 }
 
 bool CreateTextures() {
-    LOGI("CreateTextures start");
-    GLsizei yWidth = static_cast<GLsizei>(m_RenderFrame.width);
-    GLsizei yHeight = static_cast<GLsizei>(m_RenderFrame.height);
-
     glActiveTexture(GL_TEXTURE0);
-    glGenTextures(1, &m_YTextureId);
-    glBindTexture(GL_TEXTURE_2D, m_YTextureId);
+    glGenTextures(1, &m_texture);
+    glBindTexture(GL_TEXTURE_2D, m_texture);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, yWidth, yHeight, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE,
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, mWidth, mHeight, 0, GL_RGB, GL_UNSIGNED_BYTE,
                  nullptr);
-//    glGenerateMipmap(GL_TEXTURE_2D);
+    glGenerateMipmap(GL_TEXTURE_2D);
 
-    if (!m_YTextureId) {
+    if (!m_texture) {
 //        GLUtils::CheckGLError("GLByteFlowRender::CreateTextures Create Y texture");
-        return false;
-    }
-
-    GLsizei uWidth = static_cast<GLsizei>(m_RenderFrame.width / 2);
-    GLsizei uHeight = yHeight / 2;
-
-    glActiveTexture(GL_TEXTURE1);
-    glGenTextures(1, &m_UTextureId);
-    glBindTexture(GL_TEXTURE_2D, m_UTextureId);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, uWidth, uHeight, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE,
-                 nullptr);
-//    glGenerateMipmap(GL_TEXTURE_2D);
-
-    if (!m_UTextureId) {
-//        GLUtils::CheckGLError("GLByteFlowRender::CreateTextures Create U texture");
-        return false;
-    }
-
-    auto vWidth = static_cast<GLsizei>(m_RenderFrame.width / 2);
-    GLsizei vHeight = (GLsizei) yHeight / 2;
-
-    glActiveTexture(GL_TEXTURE2);
-    glGenTextures(1, &m_VTextureId);
-    glBindTexture(GL_TEXTURE_2D, m_VTextureId);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, vWidth, vHeight, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE,
-                 nullptr);
-//    glGenerateMipmap(GL_TEXTURE_2D);
-
-    if (!m_VTextureId) {
-//        GLUtils::CheckGLError("GLByteFlowRender::CreateTextures Create V texture");
         return false;
     }
 
@@ -182,35 +113,15 @@ bool CreateTextures() {
 }
 
 bool UpdateTextures() {
-    if (m_RenderFrame.ppPlane[0] == nullptr) {
-        LOGI("::UpdateTextures null");
-        return false;
-    }
-
-    if (!m_YTextureId && !m_UTextureId && !m_VTextureId && !CreateTextures()) {
+    if (!m_texture && !CreateTextures()) {
         return false;
     }
 
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, m_YTextureId);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, (GLsizei) m_RenderFrame.width,
-                 (GLsizei) m_RenderFrame.height, 0,
-                 GL_LUMINANCE, GL_UNSIGNED_BYTE, m_RenderFrame.ppPlane[0]);
-//    glGenerateMipmap(GL_TEXTURE_2D);
-
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, m_UTextureId);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, (GLsizei) m_RenderFrame.width >> 1,
-                 (GLsizei) m_RenderFrame.height >> 1, 0,
-                 GL_LUMINANCE, GL_UNSIGNED_BYTE, m_RenderFrame.ppPlane[1]);
-//    glGenerateMipmap(GL_TEXTURE_2D);
-
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, m_VTextureId);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, (GLsizei) m_RenderFrame.width >> 1,
-                 (GLsizei) m_RenderFrame.height >> 1, 0,
-                 GL_LUMINANCE, GL_UNSIGNED_BYTE, m_RenderFrame.ppPlane[2]);
-//    glGenerateMipmap(GL_TEXTURE_2D);
+    glBindTexture(GL_TEXTURE_2D, m_texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, img.cols,
+                 img.rows, 0,
+                 GL_RGB, GL_UNSIGNED_BYTE, img.data);
 
     return true;
 }

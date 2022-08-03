@@ -34,7 +34,6 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_top_topsea_camera2ndk_JNINative_initOpengl(JNIEnv *env, jobject thiz) {
     Init();
-    init();
 }
 
 extern "C"

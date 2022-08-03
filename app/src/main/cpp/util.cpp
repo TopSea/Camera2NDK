@@ -10,7 +10,6 @@
 #include "native-lib.h"
 #include "opencv2/opencv.hpp"
 #include "iostream"
-#include "ImageDef.h"
 
 using namespace std;
 using namespace cv;
@@ -69,65 +68,4 @@ GLuint CreateProgram(GLuint vShader, GLuint fShader) {
     glDeleteShader(vShader);
     glDeleteShader(fShader);
     return program;
-}
-
-GLuint CreateTexture2D(unsigned char *pixelData, int width, int height) {
-    GLuint texture;
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture);
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);// 表示图像放大时候，使用线性过滤
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);// 表示图像缩小时候，使用线性过滤
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, pixelData);//GL_RGBA
-    glBindTexture(GL_TEXTURE_2D, 0);
-    return texture;
-}
-
-unsigned char *DecodeBMP(unsigned char *bmpFileData, int &width, int &height) {
-    if (0x4D42 == *((unsigned short *) bmpFileData)) { // 数据头是否为0x4D42 判断是否是 24 位的位图,
-        // 读格式头
-        int pixelDataOffset = *((int *) (bmpFileData + 10));// 取出像素数据在内存块的偏移地址
-        width = *((int *) (bmpFileData + 18));
-        height = *((int *) (bmpFileData + 22));
-        unsigned char *pixelData = bmpFileData + pixelDataOffset;
-        LOGI("DecodeBMP success ");
-        return pixelData;
-    } else {
-        // 读格式头
-        int pixelDataOffset = *((int *) (bmpFileData + 6));// 取出像素数据在内存块的偏移地址
-        width = *((int *) (bmpFileData + 18));
-        height = *((int *) (bmpFileData + 22));
-        unsigned char *pixelData = bmpFileData + pixelDataOffset;
-        LOGI("DecodeBMP success ");
-        return pixelData;
-    }
-}
-
-GLuint CreateTextureFromBMP(const char *bmpPath) {
-    int nFileSize = 0;
-    unsigned char *bmpFileContent = LoadFileContent(bmpPath, nFileSize);
-    if (bmpFileContent == nullptr) {
-        return 0;
-    }
-    int bmpWidth = 0, bmpHeight = 0;
-    unsigned char *pixelData = DecodeBMP(bmpFileContent, bmpWidth, bmpHeight);
-    if (pixelData == nullptr) {
-        delete[] bmpFileContent;
-        LOGE("CreateTextureFromBMP error ");
-        return 0;
-    }
-
-    Mat src(128,128, CV_8UC3);
-    src.data = pixelData;
-    cvtColor(src, src, COLOR_BGR2RGB);
-    for (int i = 0; i < 100; ++i) {
-        LOGE("LoadFileContent success ...src.data[i]: %d", (int)src.data[i]);
-    }
-
-    GLuint texture = CreateTexture2D(src.data, bmpWidth, bmpHeight);
-    delete[] bmpFileContent;
-    LOGI("CreateTextureFromBMP success ");
-    return texture;
 }

@@ -18,6 +18,7 @@ import androidx.annotation.RequiresApi
 import androidx.annotation.WorkerThread
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import top.topsea.camera2ndk.PreviewUtil.isHardwareLevelSupported
 
 const val TAG: String = "TopSea:::"
 @RequiresApi(Build.VERSION_CODES.M)
@@ -79,14 +80,13 @@ class MainActivity : AppCompatActivity(), Handler.Callback {
                     val maxHeight = 1080
                     val previewSize = getOptimalSize(cameraCharacteristics, SurfaceTexture::class.java, maxWidth, maxHeight)!!
 
-                    // Set up an ImageReader to receive preview frame data if YUV_420_888 is supported.
                     val imageFormat = ImageFormat.YUV_420_888
                     val streamConfigurationMap = cameraCharacteristics[CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP]
                     if (streamConfigurationMap?.isOutputSupportedFor(imageFormat) == true) {
-                        Log.d(TAG, "MSG_SET_PREVIEW_SIZE: start2")
                         previewDataImageReader = ImageReader.newInstance(previewSize.width, previewSize.height, imageFormat, 3)
                         previewDataImageReader?.setOnImageAvailableListener(OnPreviewDataAvailableListener(), cameraHandler)
                         previewDataSurface = previewDataImageReader?.surface
+                        Log.d(TAG, "previewDataImageReader: ${previewDataImageReader == null}")
                     }
                 }
                 Log.d(TAG, "Handle message: MSG_SET_PREVIEW_SIZE")
@@ -110,6 +110,7 @@ class MainActivity : AppCompatActivity(), Handler.Callback {
     }
 
     val IMAGE_FORMAT_I420 = 0x04
+    val IMAGE_FORMAT_RGBA = 0x08
     private lateinit var jniGLSurfaceView: JniGLSurfaceView
     private lateinit var jniRender: JniRender
 
